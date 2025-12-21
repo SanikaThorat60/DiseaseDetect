@@ -12,8 +12,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 mongoose.connect("mongodb://127.0.0.1:27017/form", {
-  useNewUrlParser: true,// Use the modern connection string parser
-  useUnifiedTopology: true   // Use the new server monitoring engine
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 });
 mongoose.connection.once("open", () => {
   console.log("MongoDB connected successfully!");
@@ -60,9 +60,7 @@ app.post("/predict", upload.single("image"), async (req, res) => {
       return res.json({
         disease: "Healthy",
         probability: 1,
-        description: "No disease detected",
-        treatment: { chemical: ["N/A"], biological: ["N/A"], prevention: ["N/A"] },
-        similar_images: []
+
       });
     }
 
@@ -70,13 +68,6 @@ app.post("/predict", upload.single("image"), async (req, res) => {
     res.json({
       disease: top.name || "Unknown",
       probability: top.probability || 0,
-      description: top.details?.description || "No description available",
-      treatment: {
-        chemical: top.details?.treatment?.chemical || ["N/A"],
-        biological: top.details?.treatment?.biological || ["N/A"],
-        prevention: top.details?.treatment?.prevention || ["N/A"]
-      },
-      similar_images: top.details?.similar_images?.map(img => img.url) || []
     });
 
   } catch (err) {
@@ -85,8 +76,6 @@ app.post("/predict", upload.single("image"), async (req, res) => {
       disease: "Unknown",
       probability: 0,
       description: "Failed to detect disease. Please try again.",
-      treatment: { chemical: ["N/A"], biological: ["N/A"], prevention: ["N/A"] },
-      similar_images: []
     });
   }
 });
@@ -94,15 +83,31 @@ app.post("/predict", upload.single("image"), async (req, res) => {
 // Login Endpoint
 app.post("/Login", async (req, res) => {
   const { email, password } = req.body;
+
   try {
     const user = await FormModel.findOne({ email });
-    if (!user) return res.json("no record existed");
-    if (user.password !== password) return res.json("password incorrect");
-    res.json("success");
+
+    if (!user) {
+      return res.json({ message: "no record existed" });
+    }
+
+    if (user.password !== password) {
+      return res.json({ message: "password incorrect" });
+    }
+
+    return res.json({
+      message: "success",
+      user: {
+        name: user.name,
+        email: user.email
+      }
+    });
+
   } catch (err) {
-    res.status(500).json(err);
+    res.status(500).json({ message: "server error" });
   }
 });
+
 
 // Signin / Signup Endpoint
 app.post("/Signin", async (req, res) => {

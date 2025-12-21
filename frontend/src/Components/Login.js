@@ -1,62 +1,55 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 import 'bootstrap/dist/css/bootstrap.min.css';
+import API_BASE_URL from "../config";
 
-function Login() {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-   const navigate = useNavigate()
+function Login({ onLogin }) {
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    if (!formData.email || !formData.password) {
+      alert("Please fill in all fields");
+      return;
+    }
 
-  // Check if fields are empty
-  if (!formData.email || !formData.password) {
-    alert("Please fill in all fields");
-    return;
-  }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      alert("Please enter a valid email address");
+      return;
+    }
 
-  // Send request to backend
-  axios.post("http://localhost:5000/login", {
-    email: formData.email,
-    password: formData.password,
-  })
-    .then((result) => {
-      console.log(result.data);
-
-      if (result.data === "success") {
-        alert("✅ Login successful!"); 
-        navigate("/home");            
-      } else if (result.data === "password incorrect") {
-        alert("Incorrect password. Try again."); 
-      } else if (result.data === "no record existed") {
-        alert("No account found. Please sign up first.");
-        navigate("/Signin"); 
-      } else {
-        alert("Something went wrong. Please try again.");
-      }
-    })
-    .catch((err) => {
-      console.error(err);
-      alert("Server error. Please try again later.");
-    });
-};
+    axios.post(`${API_BASE_URL}/login`, formData)
+      .then(result => {
+        console.log("Login API response:", result.data);
+        if (result.data.message === "success") {
+          const userData = result.data.user;
+          onLogin(userData);
+          localStorage.setItem("user", JSON.stringify(userData));
+          navigate("/Detection");
+        } else if (result.data.message === "password incorrect") {
+          alert("Incorrect password");
+        } else if (result.data.message === "no record existed") {
+          alert("No account found. Please sign up first.");
+          navigate("/Signin");
+        }
+      })
+      .catch(err => console.log(err));
+  };
 
   return (
-    <div className="d-flex justify-content-center align-items-center bg-success bg-opacity-25 vh-100 ">
-      <div className="card p-4 shadow" style={{ width: "400px" }}>
+    <div className="d-flex justify-content-center align-items-center bg-success bg-opacity-25 vh-100">
+      <div className="auth-card">
         <h3 className="text-center mb-3">Login</h3>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="form-label">Email address</label>
+            <label>Email address</label>
             <input
               type="email"
               name="email"
@@ -69,7 +62,7 @@ function Login() {
           </div>
 
           <div className="mb-3">
-            <label className="form-label">Password</label>
+            <label>Password</label>
             <input
               type="password"
               name="password"
@@ -80,17 +73,11 @@ function Login() {
               required
             />
           </div>
-
-          <button class="button" type="submit" className="btn btn-success w-100">
-            Login
-          </button>
+          <button type="submit" className="btn btn-success w-100">Login</button>
         </form>
 
         <p className="text-center mt-3">
-          Don’t have an account?{" "}
-          <Link to="/Signin" className="text-decoration-none">
-            Sign Up
-          </Link>
+          Don’t have an account? <Link to="/Signin">Sign Up</Link>
         </p>
       </div>
     </div>

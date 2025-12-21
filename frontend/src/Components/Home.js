@@ -5,8 +5,8 @@ function Home() {
     <div className="home-page">
       {/* Hero Section */}
       <div className="main">
-        <h1>Welcome To DiseaseDetection</h1>
-        <p>🌱 Smart Farming Starts Here</p>
+        <h1>Welcome To DiseaseDetect</h1>
+        <p>HAPPY PLANTS, BETTER YEILD</p>
       </div>
 
       {/* Disease Cards */}
@@ -65,8 +65,6 @@ function Home() {
         <div className="footer-content">
           <div className="footer-logo">
             <img src="/logoplant.png" alt="logo" />
-            <h3>DiseaseDetection</h3>
-            <p>🌱 Healthy Crops, Smarter Future</p>
           </div>
 
           <div className="footer-links">
@@ -74,19 +72,19 @@ function Home() {
             <ul>
               <li><a href="/">Home</a></li>
               <li><a href="/Detection">Detection</a></li>
-              <li><a href="/Signup">Signup/Login</a></li>
               <li><a href="/About">About</a></li>
+              <li><a href="/Signin">Signup/Login</a></li>
             </ul>
           </div>
 
           <div className="footer-contact">
             <h4>Contact</h4>
-            <p>Email: support@DiseaseDetection.com</p>
+            <p>Email: support@DiseaseDetect.com</p>
             <p>📍 Pune, India</p>
           </div>
         </div>
         <div className="footer-bottom">
-          <p>© 2025 DiseaseDetection. All rights reserved.</p>
+          <p>© 2025 DiseaseDetect. All rights reserved.</p>
         </div>
       </footer>
     </div>
