@@ -3,8 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import API_BASE_URL from "../config";
+import { toast } from 'react-toastify';
 
-function Signin() {
+function Signin({ onLogin }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,27 +15,38 @@ function Signin() {
     e.preventDefault();
 
     if (!name || !email || !password) {
-      alert("Please fill in all fields");
+      toast.error("Please fill in all fields");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      alert("Please enter a valid email address");
+      toast.error("Please enter a valid email address");
       return;
     }
 
     if (password.length < 6) {
-      alert("Password must be at least 6 characters long");
+      toast.error("Password must be at least 6 characters long");
       return;
     }
 
     axios.post(`${API_BASE_URL}/Signin`, { name, email, password })
       .then(result => {
-        alert("Signup successful!");
-        navigate('/Login');
+        const createdUser = result?.data?.user;
+        if (createdUser) {
+          toast.success("Signup successful — logged in!");
+          localStorage.setItem("user", JSON.stringify(createdUser));
+          onLogin && onLogin(createdUser);
+          setTimeout(() => navigate('/Detection'), 700);
+        } else {
+          toast.success("Signup successful!");
+          navigate('/Login');
+        }
       })
-      .catch(err => console.log(err));
+      .catch(err => {
+        toast.error("An error occurred during signup");
+        console.log(err);
+      });
   };
 
   return (

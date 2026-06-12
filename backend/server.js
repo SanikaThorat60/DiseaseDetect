@@ -27,12 +27,11 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const PLANT_ID_API_KEY = process.env.PLANT_ID_API_KEY;
 const PLANT_ID_URL = "https://api.plant.id/v2/health_assessment";
+const SearchHistory = require('./models/SearchHistory');
 
 app.post("/predict", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No image uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ error: "No image uploaded" });
 
     const imageBase64 = req.file.buffer.toString("base64");
 
@@ -57,26 +56,136 @@ app.post("/predict", upload.single("image"), async (req, res) => {
     const diseases = response.data.health_assessment?.diseases || [];
 
     if (!diseases.length) {
-      return res.json({
-        disease: "Healthy",
-        probability: 1,
-
-      });
+      return res.json({ disease: "Healthy", probability: 1 });
     }
 
-    const top = diseases[0];
-    res.json({
-      disease: top.name || "Unknown",
-      probability: top.probability || 0,
-    });
+    const top = diseases[0] || {};
+    const details = top.disease_details || {};
+
+    // Helper to get text from potential arrays or objects
+    const extractText = (field) => {
+      if (!field) return "";
+      if (Array.isArray(field)) return field.join(" ");
+      if (typeof field === "object") return field.description || "";
+      return String(field);
+    };
+
+    // Try a number of places for a readable disease/plant name
+    const pickName = () => {
+      return (
+        top?.name ||
+        top?.disease?.name ||
+        details?.name ||
+        details?.common_names?.[0] ||
+        top?.plant?.name ||
+        top?.plant?.common_names?.[0] ||
+        top?.scientific_name ||
+        response.data?.suggestions?.[0]?.plant_name ||
+        response.data?.suggestions?.[0]?.name ||
+        null
+      );
+    };
+
+    let diseaseName = pickName() || 'Unknown';
+
+    const treatmentParts = [];
+    if (details.treatment?.biological) treatmentParts.push(`Biological: ${extractText(details.treatment.biological)}`);
+    if (details.treatment?.chemical) treatmentParts.push(`Chemical: ${extractText(details.treatment.chemical)}`);
+    if (details.treatment?.prevention) treatmentParts.push(`Prevention: ${extractText(details.treatment.prevention)}`);
+
+    const responseBody = {
+      disease: diseaseName,
+      probability: top?.probability || 0,
+      description: extractText(details.description) || "No description available.",
+      treatment: treatmentParts.length > 0 ? treatmentParts.join("\n\n") : "No specific treatment steps found for this stage.",
+      similar_images: top.similar_images?.map(i => i.url) || response.data.similar_images || [],
+      raw: top
+    };
+
+    // If still Unknown, try a few raw fallbacks
+    if ((!responseBody.disease || responseBody.disease === 'Unknown') && responseBody.raw) {
+      const raw = responseBody.raw;
+      responseBody.disease = raw?.suggestions?.[0]?.plant_name || raw?.suggestions?.[0]?.name || raw?.disease?.name || raw?.disease_details?.name || raw?.plant?.name || raw?.plant?.common_names?.[0] || responseBody.disease;
+    }
+
+    // Persist history if we have a meaningful name
+    try {
+      // ensure compatibility with SearchHistory schema which expects result.name
+      responseBody.name = responseBody.disease;
+      const user = req.body.user ? JSON.parse(req.body.user) : null;
+      const shouldSave = responseBody.disease && responseBody.disease !== 'Unknown' && (responseBody.probability || 0) > 0.05;
+      if (shouldSave) {
+        const created = await SearchHistory.create({
+          user: undefined,
+          userName: user?.name,
+          userEmail: user?.email,
+          imageUrl: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : undefined,
+          result: responseBody
+        });
+        console.log('Saved history id=', created._id.toString(), 'name=', responseBody.disease);
+      } else {
+        console.log('Skipping saving history for Unknown/low-confidence result');
+      }
+    } catch (saveErr) {
+      console.error('Failed to save search history:', saveErr);
+    }
+
+    return res.json(responseBody);
 
   } catch (err) {
     console.error("Plant.id API error:", err.response?.data || err.message || err);
-    res.status(500).json({
+    return res.status(500).json({
       disease: "Unknown",
       probability: 0,
       description: "Failed to detect disease. Please try again.",
     });
+  }
+});
+
+// History endpoint - fetch history by user email
+app.get('/history/:email', async (req, res) => {
+  try {
+    const email = req.params.email;
+    const records = await SearchHistory.find({ userEmail: email }).sort({ createdAt: -1 }).lean();
+    res.json(records);
+  } catch (err) {
+    console.error('Error fetching history:', err);
+    res.status(500).json({ message: 'Error fetching history' });
+  }
+});
+
+// Debug endpoint - fetch recent history (useful when email unknown)
+app.get('/debug/history', async (req, res) => {
+  try {
+    const records = await SearchHistory.find().sort({ createdAt: -1 }).limit(50).lean();
+    res.json(records);
+  } catch (err) {
+    console.error('Error fetching debug history:', err);
+    res.status(500).json({ message: 'Error fetching debug history' });
+  }
+});
+
+// Debug endpoint - fetch most recent saved record
+app.get('/debug/last', async (req, res) => {
+  try {
+    const rec = await SearchHistory.findOne().sort({ createdAt: -1 }).lean();
+    if (!rec) return res.status(404).json({ message: 'no records' });
+    res.json(rec);
+  } catch (err) {
+    console.error('Error fetching debug last history:', err);
+    res.status(500).json({ message: 'Error fetching debug last history' });
+  }
+});
+
+// Delete history item by id
+app.delete('/history/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    await SearchHistory.findByIdAndDelete(id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting history:', err);
+    res.status(500).json({ message: 'Error deleting history' });
   }
 });
 
@@ -119,4 +228,32 @@ app.post("/Signin", async (req, res) => {
   }
 });
 
-app.listen(5000, () => console.log("Server running on port 5000"));
+// Log registered routes for debugging
+const listRoutes = () => {
+  try {
+    const routes = [];
+    app._router.stack.forEach((middleware) => {
+      if (middleware.route) {
+        // routes registered directly on the app
+        const methods = Object.keys(middleware.route.methods).join(',').toUpperCase();
+        routes.push({ path: middleware.route.path, methods });
+      } else if (middleware.name === 'router' && middleware.handle && middleware.handle.stack) {
+        // router middleware
+        middleware.handle.stack.forEach((handler) => {
+          if (handler.route) {
+            const methods = Object.keys(handler.route.methods).join(',').toUpperCase();
+            routes.push({ path: handler.route.path, methods });
+          }
+        });
+      }
+    });
+    console.log('Registered routes:', routes);
+  } catch (e) {
+    console.error('Failed to list routes', e);
+  }
+};
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+  listRoutes();
+});

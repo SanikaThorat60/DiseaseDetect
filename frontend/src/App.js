@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Detection from "./Components/Detection";
 import Signin from "./Components/Signin";
 import About from "./Components/About";
@@ -29,6 +31,14 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+    toast.info("Logged out successfully", {
+      position: "top-right",
+      autoClose: 2000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
   };
 
   const toggleMenu = () => {
@@ -41,6 +51,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
       <div className="header">
         <div className="header-container">
           <div className="logo">
@@ -87,7 +98,7 @@ function App() {
           path="/Profile"
           element={user ? <Profile user={user} /> : <Navigate to="/Login" />}
         />
-        <Route path="/Signin" element={<Signin />} />
+        <Route path="/Signin" element={<Signin onLogin={handleLogin} />} />
         <Route path="/Login" element={<Login onLogin={handleLogin} />} />
       </Routes>
     </BrowserRouter>

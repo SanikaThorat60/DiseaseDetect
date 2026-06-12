@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import API_BASE_URL from "../config";
+import { toast } from 'react-toastify';
 
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -15,13 +16,13 @@ function Login({ onLogin }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
-      alert("Please fill in all fields");
+      toast.error("Please fill in all fields");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      alert("Please enter a valid email address");
+      toast.error("Please enter a valid email address");
       return;
     }
 
@@ -32,15 +33,19 @@ function Login({ onLogin }) {
           const userData = result.data.user;
           onLogin(userData);
           localStorage.setItem("user", JSON.stringify(userData));
-          navigate("/Detection");
+          toast.success("Login successful!");
+          setTimeout(() => navigate("/Detection"), 700);
         } else if (result.data.message === "password incorrect") {
-          alert("Incorrect password");
+          toast.error("Incorrect password");
         } else if (result.data.message === "no record existed") {
-          alert("No account found. Please sign up first.");
+          toast.error("No account found. Please sign up first.");
           navigate("/Signin");
         }
       })
-      .catch(err => console.log(err));
+      .catch(err => {
+        toast.error("An error occurred during login");
+        console.log(err);
+      });
   };
 
   return (
